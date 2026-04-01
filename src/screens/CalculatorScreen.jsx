@@ -19,10 +19,51 @@ const CalculatorScreen = ({ navigation }) => {
     const [history, setHistory] = useState('');
 
     const handlePress = (value) => {
-        if (display === '0' && !['+', '-', '*', '/'].includes(value)) {
+        if (display === 'Error') {
+            if (['+', '-', '*', '/'].includes(value)) {
+                setDisplay('0' + value);
+            } else if (value === '.') {
+                setDisplay('0.');
+            } else {
+                setDisplay(value);
+            }
+            return;
+        }
+
+        if (display === '0' && !['+', '-', '*', '/', '.'].includes(value)) {
             setDisplay(value);
         } else {
+            if (value === '.') {
+                const parts = display.split(/[-+*/()]/);
+                const currentNumber = parts[parts.length - 1];
+                if (currentNumber && currentNumber.includes('.')) {
+                    return;
+                }
+            }
             setDisplay(display + value);
+        }
+    };
+
+    const handleBracket = () => {
+        if (display === 'Error') {
+            setDisplay('(');
+            return;
+        }
+
+        const openBrackets = (display.match(/\(/g) || []).length;
+        const closeBrackets = (display.match(/\)/g) || []).length;
+        const lastChar = display.slice(-1);
+
+        if (display === '0') {
+            setDisplay('(');
+        } else if (openBrackets > closeBrackets && !['+', '-', '*', '/', '('].includes(lastChar)) {
+            setDisplay(display + ')');
+        } else {
+            if (/\d|\)|\%/.test(lastChar)) {
+                setDisplay(display + '*(');
+            } else {
+                setDisplay(display + '(');
+            }
         }
     };
 
@@ -32,6 +73,10 @@ const CalculatorScreen = ({ navigation }) => {
     };
 
     const handleBackspace = () => {
+        if (display === 'Error') {
+            setDisplay('0');
+            return;
+        }
         if (display.length > 1) {
             setDisplay(display.slice(0, -1));
         } else {
@@ -40,9 +85,31 @@ const CalculatorScreen = ({ navigation }) => {
     };
 
     const handleCalculate = () => {
+        if (display === 'Error') return;
         try {
-            const result = eval(display).toString();
-            setHistory(display + ' =');
+            let expression = display.replace(/%/g, '/100');
+            
+            const openBrackets = (expression.match(/\(/g) || []).length;
+            const closeBrackets = (expression.match(/\)/g) || []).length;
+            if (openBrackets > closeBrackets) {
+                expression += ')'.repeat(openBrackets - closeBrackets);
+            }
+
+            let result = eval(expression);
+            if (!isFinite(result) || isNaN(result)) {
+                setDisplay('Error');
+                setHistory(display + ' =');
+                return;
+            }
+
+            result = parseFloat(result.toFixed(10)).toString();
+
+            let finalDisplay = display;
+            if (openBrackets > closeBrackets) {
+                finalDisplay += ')'.repeat(openBrackets - closeBrackets);
+            }
+
+            setHistory(finalDisplay + ' =');
             setDisplay(result);
         } catch (error) {
             setDisplay('Error');
@@ -96,7 +163,7 @@ const CalculatorScreen = ({ navigation }) => {
             <View style={styles.buttonsContainer}>
                 <View style={styles.row}>
                     <Button label="C" type="action" onPress={handleClear} />
-                    <Button label="()" type="action" onPress={() => handlePress('(')} />
+                    <Button label="()" type="action" onPress={handleBracket} />
                     <Button label="%" type="action" onPress={() => handlePress('%')} />
                     <Button label="/" type="operator" onPress={() => handlePress('/')} />
                 </View>
